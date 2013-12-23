@@ -1,0 +1,20 @@
+#ifndef _NETWORK_H_
+#define _NETWORK_H_
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <sys/wait.h>
+#include <string.h>
+#include <netdb.h>
+
+int open_tcp(char *host_name, int port);
+/*
+nsend(); ·¢ËÍ×ÖœÚµœÍøÂç
+nrecv();//·¢ËÍÍøÂç×ÖœÚÁ÷
+recv_line();//ŽÓsocketœÓÊÕÒ»ÐÐÒÔ»Ø³µŒüœáÊø
+close();//socket中已经有这个函数了，没有必要再写一个
+*/
+#endif

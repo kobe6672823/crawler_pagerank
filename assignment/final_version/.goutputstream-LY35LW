@@ -1,0 +1,11 @@
+#ifndef _NETWORK_H_
+#define _NETWORK_H_
+
+
+
+int open_tcp(char *host_name, int port);
+/*
+nsend(); 发送字节到网络
+nrecv();//发送网络字节流
+recv_line();//从socket接收一行以回车键结束
+close();//socket

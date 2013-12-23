@@ -1,0 +1,6 @@
+#ifndef __HASH_H__
+#define __HASH_H__
+
+unsigned int FNVHash1(char data[],int prime);
+
+#endif

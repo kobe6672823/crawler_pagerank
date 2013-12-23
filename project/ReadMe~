@@ -1,0 +1,13 @@
+all: bfcheck
+
+bfcheck: bloomfilter.o main.o hash.o
+	cc -o bfcheck -Wall -pedantic bloomfilter.o main.o hash.o
+
+bloomfilter.o: bloomfilter.c bloomfilter.h hash.h
+	cc -o bloomfilter.o -Wall -pedantic -ansi -c bloomfilter.c
+
+main.o: main.c bloomfilter.h
+	cc -o main.o -Wall -pedantic -ansi -c main.c
+
+hash.o: hash.c hash.h
+	cc -o hash.o -Wall -pedantic -ansi -c hash.c

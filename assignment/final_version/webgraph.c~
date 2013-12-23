@@ -1,0 +1,250 @@
+/*****
+** webgraph.c
+** - implements the methods declared in webgraph.h
+** - 构造、维护和存储整个web graph的顶点和边数据,分析web graph的链接关系,确保多线程安全访问
+*/
+#include "webgraph.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include "hash.h"
+#include <string.h>
+
+// 初始化web graph
+int init_webg(struct web_graph *webg)
+{
+	int i = 0, j = 0;
+	
+	webg->ind = (int *)malloc(sizeof (int ) * GRAPH_SIZE);
+	if (webg->ind == NULL)
+	{
+		printf("给入度数组分配空间失败！\n");
+		return INIT_FAIL;
+	}
+	else
+	{
+		for (i = 0; i < GRAPH_SIZE; i++)
+			webg->ind[i] = 0;
+	}
+
+	webg->existed_page = (int *)malloc(sizeof (int ) * GRAPH_SIZE);
+	if (webg->existed_page == NULL)
+	{
+		printf("fail to malloc space for existed_page!\n");
+		free(webg->ind);
+		return INIT_FAIL;
+	}
+	else
+	{
+		for (i = 0; i < GRAPH_SIZE; i++)
+			webg->existed_page[i] = 0;
+	}
+
+	webg->vertex_set = (struct node*)malloc(sizeof (struct node) * HASH_TABLE_SIZE);
+	if (webg->vertex_set == NULL)
+	{
+		free(webg->ind);
+		free(webg->existed_page);
+		printf("给点集分配空间失败！\n");
+		return INIT_FAIL;
+	}
+	for (i = 0; i < HASH_TABLE_SIZE; i++)
+		webg->vertex_set[i].next_ptr = NULL;
+
+	webg->all_url_list = (char **)malloc(sizeof (char *) * GRAPH_SIZE);
+	if (webg->all_url_list == NULL)
+	{
+		printf("给url列表分配空间失败!\n");
+		free(webg->ind); 
+		free(webg->existed_page); 
+		free(webg->vertex_set);
+		return INIT_FAIL;
+	}
+
+	for (i = 0; i < GRAPH_SIZE; i++)
+	{
+		webg->all_url_list[i] = (char *)malloc(sizeof (char) * LINK_LEN);
+		if (webg->all_url_list[i] == NULL)
+		{
+			printf("给url列表分配空间失败！\n");
+			free(webg->ind); 
+			free(webg->existed_page); 
+			free(webg->vertex_set);
+			for (j = 0; j < i; j++)
+				free(webg->all_url_list[j]);
+			free(webg->all_url_list);
+			return INIT_FAIL;
+		}
+	}
+	webg->edge_set = (int **)malloc(sizeof (int *) * GRAPH_SIZE);
+	if (webg->edge_set == NULL)
+	{
+		free(webg->ind); 
+		free(webg->existed_page); 
+		free(webg->vertex_set);
+		for (i = 0; i < GRAPH_SIZE; i++)
+			free(webg->all_url_list[i]);
+		free(webg->all_url_list);
+		return INIT_FAIL;
+	}
+	for (i = 0; i < GRAPH_SIZE; i++)
+		webg->edge_set[i] = NULL;
+	webg->all_url_list_size = 0;
+	webg->edge_set_size = 0;
+	webg->existed_page_size = 0;
+	return INIT_SUCCEED;
+}
+
+//加入一个顶点
+int insert_vertex(struct web_graph *webg, char * url)
+{
+	unsigned int key = JSHash(url, HASH_TABLE_SIZE);
+	int num;
+	struct node *new_ptr = NULL;
+
+	num = ++(webg->all_url_list_size);
+	strcpy(webg->all_url_list[num], url);
+	new_ptr = (struct node *)malloc(sizeof (struct node));
+	if (new_ptr == NULL)
+	{
+		printf("分配内存失败！\n");
+		return -1;
+	}
+	new_ptr->number = num;
+	new_ptr->url = (char *)malloc(sizeof (char ) * LINK_LEN);
+	strcpy(new_ptr->url, url);
+	new_ptr->next_ptr = webg->vertex_set[key].next_ptr;
+	webg->vertex_set[key].next_ptr = new_ptr;//这里用的是头插法
+
+	return num;//返回这个顶点的编号
+}
+
+// 判断给定顶点是否在graph中
+int has_vertex(struct web_graph *webg, char *url)
+{
+	unsigned int key = JSHash(url, HASH_TABLE_SIZE);
+	struct node *cur_ptr = webg->vertex_set[key].next_ptr;
+
+	while (cur_ptr != NULL)
+	{
+		if (strcmp(cur_ptr->url, url) == 0)
+			return cur_ptr->number;
+		cur_ptr = cur_ptr->next_ptr;
+	}
+	return NOT_IN_SET;
+}
+
+//插入一条边到graph中
+void insert_edge(struct web_graph *webg, int src_num, int dst_num, int pos)
+{
+	webg->edge_set[src_num][pos] = dst_num;
+}
+
+// graph的顶点数
+int vertex_size(struct web_graph *webg)
+{
+	return webg->all_url_list_size;
+}
+//calc_ind_cdf();// 计算所有顶点的入度的累积分布
+//calc_pagerank();// 计算所有顶点的pagerank
+//find_ind(char *url);// 查找给定顶点的入度
+//gen_graphviz();// 生成描述图拓扑的graphviz脚本
+
+// 销毁web graph
+void destroy_webg(struct web_graph *webg)
+{
+	int i = 0;
+
+	free(webg->ind); 
+	free(webg->existed_page); 
+	for (i = 0; i < HASH_TABLE_SIZE; i++)
+	{
+		if (webg->vertex_set[i].next_ptr != NULL)
+		{
+			destroy_list(webg->vertex_set[i].next_ptr);//这里属于对链表的回收
+		}
+	}
+	free(webg->vertex_set);
+
+	for (i = 0; i < GRAPH_SIZE; i++)
+		free(webg->all_url_list[i]);
+	free(webg->all_url_list);
+
+	for (i = 1; i <= webg->all_url_list_size; i++)
+		free(webg->edge_set[i]);
+	free(webg->edge_set);
+}
+
+//对链表内存的释放
+void destroy_list(struct node *head_ptr)
+{
+	struct node *n_ptr = head_ptr->next_ptr;
+	while (n_ptr != NULL)
+	{
+		head_ptr->next_ptr = n_ptr->next_ptr;
+		free(n_ptr);
+		n_ptr = head_ptr->next_ptr;
+	}
+	free(head_ptr);
+}
+
+void print_webg_to_file(struct web_graph *webg) 
+{
+	FILE *fp;
+	int i, j;
+
+	fp = fopen("webg_all_url_list.txt", "w");
+	if (fp == NULL)
+	{
+		printf("fail to open webg_all_url_list.txt\n");
+		return;
+	}
+	fprintf(fp, "size: %d\n", webg->all_url_list_size);
+	for (i = 1; i <= webg->all_url_list_size; i++)
+		fprintf(fp, "%s\n", webg->all_url_list[i]);
+	fclose(fp);
+
+	fp = fopen("webg_ind.txt", "w");
+	if (fp == NULL)
+	{
+		printf("fail to open webg_ind.txt\n");
+		return;
+	}
+	fprintf(fp, "size: %d\n", webg->all_url_list_size);
+	for (i = 1; i <= webg->all_url_list_size; i++)
+		fprintf(fp, "%d\n", webg->ind[i]);
+	fclose(fp);
+
+	fp = fopen("webg_existed_page.txt", "w");
+	if (fp == NULL)
+	{
+		printf("fail to open webg_existed_page.txt\n");
+		return;
+	}
+	fprintf(fp, "size: %d\n", webg->all_url_list_size);
+	fprintf(fp, "existed_page_size: %d\n", webg->existed_page_size);
+	for (i = 1; i <= webg->all_url_list_size; i++)
+		fprintf(fp, "%d\n", webg->existed_page[i]);
+	fclose(fp);
+
+	fp = fopen("webg_edge_set.txt", "w");
+	if (fp == NULL)
+	{
+		printf("fail to open webg_edge_set.txt\n");
+		return;
+	}
+	fprintf(fp, "size: %d\n", webg->all_url_list_size);
+	fprintf(fp, "edge_set_size: %d\n", webg->edge_set_size);
+	for (i = 1; i <= webg->all_url_list_size; i++)
+	{
+		if (webg->edge_set[i] == NULL)
+			fprintf(fp, "0\n");
+		else
+		{
+			fprintf(fp, "%d\n", webg->edge_set[i][0]);
+			for (j = 1; j <= webg->edge_set[i][0]; j++)
+				fprintf(fp, " %d", webg->edge_set[i][j]);
+			fprintf(fp, "\n");
+		}
+	}
+	fclose(fp);
+}
